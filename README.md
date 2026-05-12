@@ -14,6 +14,8 @@ Requires Node.js ≥ 20. Redis support is an optional peer dependency:
 npm install ioredis  # only if using RedisRecordStore / RedisViewStore
 ```
 
+**Zod v4** is bundled as a direct dependency. If your plugin uses `configSchema`, import `z` from `"zod"` and you'll get Zod v4. If your project already uses Zod v3, both will coexist in `node_modules` — just make sure you import from `"zod"` consistently in your plugin code so TypeScript resolves the right `ZodType`.
+
 ## Quick start
 
 ```ts
