@@ -1,6 +1,6 @@
 {
   "name": "pulsebridge",
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "description": "Plugin-based integration runtime for connecting external systems, normalizing data into canonical records, and processing them through composable processor plugins.",
   "license": "MIT",
   "keywords": [
