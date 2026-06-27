@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+docs/
+reports/
+.stryker-tmp/
+.env
+*.log
+*.tsbuildinfo
+.vscode/

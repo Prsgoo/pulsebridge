@@ -1,0 +1,70 @@
+name: Mutation Testing
+
+on:
+  schedule:
+    - cron: "0 2 1 * *" # Monthly, on the 1st at 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  mutation:
+    name: Stryker Mutation Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run mutation tests
+        run: npm run test:mutation
+
+      - name: Write job summary
+        if: always()
+        run: |
+          node -e "
+          const fs = require('fs');
+          const raw = fs.readFileSync('reports/mutation/mutation.json', 'utf8');
+          const report = JSON.parse(raw);
+          let killed = 0, survived = 0, timedOut = 0, noCoverage = 0;
+          for (const file of Object.values(report.files)) {
+            for (const m of file.mutants) {
+              if (m.status === 'Killed') killed++;
+              else if (m.status === 'Survived') survived++;
+              else if (m.status === 'Timeout') timedOut++;
+              else if (m.status === 'NoCoverage') noCoverage++;
+            }
+          }
+          const total = killed + survived + timedOut + noCoverage;
+          const score = total > 0 ? ((killed / total) * 100).toFixed(2) : '0.00';
+          const emoji = survived === 0 ? '🟢' : survived <= 5 ? '🟡' : '🔴';
+          const lines = [
+            '## Mutation Testing ' + emoji,
+            '',
+            '| Metric | Count |',
+            '|--------|-------|',
+            '| **Score** | **' + score + '%** |',
+            '| Killed | ' + killed + ' |',
+            '| Survived | ' + survived + ' |',
+            '| Timed out | ' + timedOut + ' |',
+            '| No coverage | ' + noCoverage + ' |',
+            '| Total mutants | ' + total + ' |',
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          "
+
+      - name: Upload mutation report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 30
+          if-no-files-found: ignore
