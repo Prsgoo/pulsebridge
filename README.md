@@ -38,7 +38,11 @@ A plugin is a plain object implementing the `IntegrationPlugin` contract — no 
 
 ```ts
 import { PulseBridgeCore, PluginKinds } from "pulsebridge";
-import type { IntegrationPlugin, RuntimeContext, PulseRecord } from "pulsebridge";
+import type {
+  IntegrationPlugin,
+  RuntimeContext,
+  PulseRecord,
+} from "pulsebridge";
 
 const weather: IntegrationPlugin = {
   manifest: {
@@ -47,7 +51,11 @@ const weather: IntegrationPlugin = {
     version: "1.0.0",
     kind: PluginKinds.INTEGRATION,
     operations: [
-      { id: "current", name: "Current conditions", recordType: "weather.current" },
+      {
+        id: "current",
+        name: "Current conditions",
+        recordType: "weather.current",
+      },
     ],
     polling: { defaultIntervalMs: 60_000, hard: false },
     auth: { type: "apiKey", secrets: [{ key: "WEATHER_KEY", required: true }] },
@@ -75,7 +83,7 @@ await platform.registerIntegration(weather);
 // Hand the plugin only the keys it declares in its manifest.
 await platform.provision("weather", { WEATHER_KEY: process.env.WEATHER_KEY! });
 
-await platform.start();        // boots per-plugin scheduler, runs in the background
+await platform.start(); // boots per-plugin scheduler, runs in the background
 await platform.waitForReady(); // resolves once the initial pass completes
 ```
 
@@ -102,11 +110,11 @@ Views                 PulseViewRecord<T> objects available via getView()
 
 A plugin can connect to a system three ways — all declared in one manifest, all sharing the same scoped-secret and error model:
 
-| Mode        | Direction | Plugin method | Triggered by                | Core API                                       |
-| ----------- | --------- | ------------- | --------------------------- | ---------------------------------------------- |
-| **Poll**    | pull      | `execute()`   | the scheduler, on interval  | automatic                                      |
-| **Action**  | push-out  | `invoke()`    | the host, on demand         | `platform.invokeAction(id, actionId, payload)` |
-| **Webhook** | push-in   | `ingest()`    | an external sender          | `platform.ingest(id, { body, headers })`       |
+| Mode        | Direction | Plugin method | Triggered by               | Core API                                       |
+| ----------- | --------- | ------------- | -------------------------- | ---------------------------------------------- |
+| **Poll**    | pull      | `execute()`   | the scheduler, on interval | automatic                                      |
+| **Action**  | push-out  | `invoke()`    | the host, on demand        | `platform.invokeAction(id, actionId, payload)` |
+| **Webhook** | push-in   | `ingest()`    | an external sender         | `platform.ingest(id, { body, headers })`       |
 
 Actions return an `ActionResult` — a response payload plus optional records to persist (additive; never replaces a poll bucket). Webhooks receive the **raw request bytes** so the plugin can verify the sender's signature before trusting the body, and return a `WebhookResult`.
 
@@ -117,7 +125,7 @@ Actions return an `ActionResult` — a response payload plus optional records to
 A growing set of ready-made integrations lives in the [pulsebridge-plugins](https://github.com/Prsgoo/pulsebridge-plugins) monorepo. Install any over npm:
 
 ```bash
-npm install @pulsebridge/integration-openweather
+npm install @prsgoo/integration-openweather
 ```
 
 They conform to the same contract as any third-party plugin. Scaffold your own self-contained package:
@@ -133,7 +141,11 @@ npm create pulsebridge-plugin@latest
 Connect to one external system. Declare auth requirements, polling interval, and operations in a manifest. Implement `execute()` to fetch and normalize data into canonical `PulseRecord<T>` objects.
 
 ```ts
-import type { IntegrationPlugin, RuntimeContext, PulseRecord } from "pulsebridge";
+import type {
+  IntegrationPlugin,
+  RuntimeContext,
+  PulseRecord,
+} from "pulsebridge";
 import { PluginKinds } from "pulsebridge";
 
 export class MyIntegration implements IntegrationPlugin {
@@ -150,7 +162,10 @@ export class MyIntegration implements IntegrationPlugin {
     },
   };
 
-  async execute(operationId: string, context: RuntimeContext): Promise<PulseRecord[]> {
+  async execute(
+    operationId: string,
+    context: RuntimeContext,
+  ): Promise<PulseRecord[]> {
     const key = context.secrets.get("MY_API_KEY");
     // fetch, normalize, return
     return [];
@@ -202,7 +217,7 @@ export class SummaryProcessor implements ProcessorPlugin {
   readonly manifest = {
     id: "@example/summary-processor",
     kind: PluginKinds.PROCESSOR,
-    consumes: [],               // receives all record types
+    consumes: [], // receives all record types
     consumesViews: ["my-view"], // waits for MyProcessor to run first
     produces: ["summary"],
   };
@@ -273,9 +288,12 @@ await platform.registerIntegration(new MyIntegration(), undefined, {
 The platform tracks the status of each plugin. Listen for transitions:
 
 ```ts
-platform.on("plugin:status-changed", ({ pluginId, previousStatus, newStatus }) => {
-  console.log(`${pluginId}: ${previousStatus} → ${newStatus}`);
-});
+platform.on(
+  "plugin:status-changed",
+  ({ pluginId, previousStatus, newStatus }) => {
+    console.log(`${pluginId}: ${previousStatus} → ${newStatus}`);
+  },
+);
 ```
 
 Status values: `enabled` · `disabled` · `degraded` · `auth_error` · `needs_reauth` · `misconfigured` · `rate_limited`
@@ -295,12 +313,12 @@ platform.enablePlugin("my-plugin-id"); // also clears backoff state
 
 Plugins signal errors by throwing typed classes exported from `pulsebridge`:
 
-| Class                  | When to throw                  | Platform response                                                            |
-| ---------------------- | ------------------------------ | --------------------------------------------------------------------------- |
-| `PluginAuthError`      | Credentials rejected by the API | Sets status `auth_error`                                                     |
-| `ReauthRequiredError`  | Token expired / session invalid | Calls `reauth()`, sets `needs_reauth` if not implemented                     |
-| `RateLimitError`       | HTTP 429 or equivalent         | Backs off for `retryAfterMs` (or `rateLimitDefaultBackoffMs`, or `2× pollInterval`) |
-| `PluginInputError`     | Bad action payload / unsigned webhook | Surfaced to the caller; does not degrade the polling channel         |
+| Class                 | When to throw                         | Platform response                                                                   |
+| --------------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| `PluginAuthError`     | Credentials rejected by the API       | Sets status `auth_error`                                                            |
+| `ReauthRequiredError` | Token expired / session invalid       | Calls `reauth()`, sets `needs_reauth` if not implemented                            |
+| `RateLimitError`      | HTTP 429 or equivalent                | Backs off for `retryAfterMs` (or `rateLimitDefaultBackoffMs`, or `2× pollInterval`) |
+| `PluginInputError`    | Bad action payload / unsigned webhook | Surfaced to the caller; does not degrade the polling channel                        |
 
 Accessing a secret key not declared in the plugin manifest throws `ScopedSecretAccessError` (a subclass of `PluginAuthError`), handled identically to an auth error — no exponential backoff, status set to `auth_error`.
 
@@ -312,31 +330,33 @@ The host stores secret values through `provision()`; the core encrypts them at r
 
 ```ts
 // Declared in manifest:
-auth: { secrets: [{ key: "MY_KEY", required: true }] }
+auth: {
+  secrets: [{ key: "MY_KEY", required: true }];
+}
 
 // Host provisions the value (sourced however it likes — env, form, vault):
 await platform.provision("my-plugin-id", { MY_KEY: process.env.MY_KEY });
 
 // Available in execute():
 const value = context.secrets.get("MY_KEY"); // ok
-context.secrets.get("OTHER_KEY");            // throws ScopedSecretAccessError
+context.secrets.get("OTHER_KEY"); // throws ScopedSecretAccessError
 ```
 
 Secrets are namespaced by plugin id — strict isolation, no cross-plugin access. The core never reads `process.env`. Storage of the encrypted blobs is pluggable via `secretBackend`:
 
-| Class                   | Use case                       |
-| ----------------------- | ------------------------------ |
-| `InMemorySecretBackend` | Tests and local dev (default)  |
-| `RedisSecretBackend`    | Persistence across restarts    |
+| Class                   | Use case                      |
+| ----------------------- | ----------------------------- |
+| `InMemorySecretBackend` | Tests and local dev (default) |
+| `RedisSecretBackend`    | Persistence across restarts   |
 
 Encryption is AES-256-GCM, keyed from the host-supplied `masterKey`. Without a master key, plugins that declare required secrets go to `auth_error` while the rest keep running.
 
 ## Persistence
 
-| Store                                       | Use case                                       |
-| ------------------------------------------- | ---------------------------------------------- |
-| `InMemoryRecordStore` / `InMemoryViewStore` | Tests, examples, single-process apps           |
-| `RedisRecordStore` / `RedisViewStore`       | Production; enables multi-process read access   |
+| Store                                       | Use case                                      |
+| ------------------------------------------- | --------------------------------------------- |
+| `InMemoryRecordStore` / `InMemoryViewStore` | Tests, examples, single-process apps          |
+| `RedisRecordStore` / `RedisViewStore`       | Production; enables multi-process read access |
 
 Both implement the `RecordStore` / `ViewStore` interfaces — you can provide your own.
 
