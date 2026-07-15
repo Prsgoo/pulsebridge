@@ -8,6 +8,10 @@ import type {
 } from "../contracts/webhooks/webhookDefinition.js";
 import type { ZodType } from "zod";
 
+/**
+ * Shared lifecycle methods that every integration plugin can implement,
+ * regardless of which data modes it supports (PULL, PUSH-OUT, PUSH-IN).
+ */
 export interface IntegrationPlugin<
   TConfig = unknown,
   TParams = unknown,
@@ -42,31 +46,68 @@ export interface IntegrationPlugin<
    */
   reauth?(context: RuntimeContext): Promise<void> | void;
 
-  execute(
+  /** Required when the manifest declares one or more `operations`. Use {@link PollIntegrationPlugin}. */
+  execute?(
     operationId: string,
     context: RuntimeContext,
     params?: TParams,
   ): Promise<ReadonlyArray<PulseRecord<TRaw>>>;
 
-  /**
-   * Performs an outbound action (push-out) declared in `manifest.actions`.
-   * The plugin validates `payload` itself and should throw `PluginInputError`
-   * for a bad request body, or the auth/transient/rate-limit errors for genuine
-   * endpoint failures. Required when the manifest declares any actions.
-   */
+  /** Required when the manifest declares one or more `actions`. Use {@link ActionIntegrationPlugin}. */
   invoke?(
     actionId: string,
     context: RuntimeContext,
     payload?: unknown,
   ): Promise<ActionResult> | ActionResult;
 
-  /**
-   * Handles an inbound webhook event (push-in) when `manifest.webhook` is set.
-   * Receives the raw request so it can verify the sender's signature before
-   * trusting the body. Throw `PluginInputError` for an invalid/unsigned request.
-   * Required when the manifest declares a webhook.
-   */
+  /** Required when the manifest declares a `webhook`. Use {@link WebhookIntegrationPlugin}. */
   ingest?(
+    context: RuntimeContext,
+    request: WebhookRequest,
+  ): Promise<WebhookResult> | WebhookResult;
+}
+
+/**
+ * Integration plugin that polls upstream on a schedule (PULL mode).
+ * Use this when your manifest declares `operations`. The platform calls
+ * `execute()` on each scheduler tick for every declared operation.
+ */
+export interface PollIntegrationPlugin<
+  TConfig = unknown,
+  TParams = unknown,
+  TRaw = unknown,
+> extends IntegrationPlugin<TConfig, TParams, TRaw> {
+  execute(
+    operationId: string,
+    context: RuntimeContext,
+    params?: TParams,
+  ): Promise<ReadonlyArray<PulseRecord<TRaw>>>;
+}
+
+/**
+ * Integration plugin that performs outbound actions on demand (PUSH-OUT mode).
+ * Use this when your manifest declares `actions`. The platform calls
+ * `invoke()` when a host or rule engine triggers the action.
+ */
+export interface ActionIntegrationPlugin<
+  TConfig = unknown,
+> extends IntegrationPlugin<TConfig> {
+  invoke(
+    actionId: string,
+    context: RuntimeContext,
+    payload?: unknown,
+  ): Promise<ActionResult> | ActionResult;
+}
+
+/**
+ * Integration plugin that receives inbound webhook events (PUSH-IN mode).
+ * Use this when your manifest declares a `webhook`. The platform calls
+ * `ingest()` when the webhook endpoint receives a request.
+ */
+export interface WebhookIntegrationPlugin<
+  TConfig = unknown,
+> extends IntegrationPlugin<TConfig> {
+  ingest(
     context: RuntimeContext,
     request: WebhookRequest,
   ): Promise<WebhookResult> | WebhookResult;
