@@ -13,7 +13,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/Prsgoo/pulsebridge.git"
+    "url": "git+https://github.com/Prsgoo/pulsebridge.git"
   },
   "engines": {
     "node": ">=20.0.0"
