@@ -4,7 +4,7 @@ on:
   push:
     branches: ["feature/**", "hotfix/**", "pre-release/**"]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   ci:

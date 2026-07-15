@@ -71,8 +71,7 @@ jobs:
         run: npm run build
 
       # Idempotent guard: skip a real publish when this version is already on
-      # npm so re-running a tag (or the initial manually-published version)
-      # never hard-fails on "version already exists".
+      # npm so re-running a tag never hard-fails on "version already exists".
       - name: Check if version already published
         id: version_check
         run: |
@@ -85,9 +84,16 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # No NODE_AUTH_TOKEN: auth is via the OIDC trusted publisher configured on
-      # npm. Provenance is generated automatically. A manual run defaults to a
-      # dry run; a pushed v* tag performs a real publish.
       - name: Publish to npm
         if: steps.version_check.outputs.exists != 'true' || (github.event_name == 'workflow_dispatch' && inputs.dry_run)
-        run: npm publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+        env:
+          IS_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          FLAGS="--access public"
+          if [[ "$IS_DRY_RUN" == "true" ]]; then
+            FLAGS="$FLAGS --dry-run"
+          elif [[ "$VERSION" == *-* ]]; then
+            FLAGS="$FLAGS --tag beta"
+          fi
+          npm publish $FLAGS
