@@ -105,6 +105,53 @@ describe("PulseBridgeCore – registration", () => {
     );
   });
 
+  it("throws when a plugin declares operations but has no execute()", async () => {
+    const plugin: IntegrationPlugin = {
+      manifest: {
+        id: "no-execute",
+        name: "No Execute",
+        version: "1.0.0",
+        kind: "integration",
+        operations: [{ id: "fetch", name: "Fetch", recordType: "test.record" }],
+      },
+    };
+    await expect(core.registerIntegration(plugin)).rejects.toThrow(
+      "does not implement execute()",
+    );
+  });
+
+  it("throws when a plugin declares actions but has no invoke()", async () => {
+    const plugin: IntegrationPlugin = {
+      manifest: {
+        id: "no-invoke",
+        name: "No Invoke",
+        version: "1.0.0",
+        kind: "integration",
+        operations: [],
+        actions: [{ id: "send", name: "Send" }],
+      },
+    };
+    await expect(core.registerIntegration(plugin)).rejects.toThrow(
+      "does not implement invoke()",
+    );
+  });
+
+  it("throws when a plugin declares a webhook but has no ingest()", async () => {
+    const plugin: IntegrationPlugin = {
+      manifest: {
+        id: "no-ingest",
+        name: "No Ingest",
+        version: "1.0.0",
+        kind: "integration",
+        operations: [],
+        webhook: { path: "/hook" },
+      },
+    };
+    await expect(core.registerIntegration(plugin)).rejects.toThrow(
+      "does not implement ingest()",
+    );
+  });
+
   it("throws when registering the same processor twice", async () => {
     const plugin = makeProcessorPlugin();
     await core.registerProcessor(plugin);

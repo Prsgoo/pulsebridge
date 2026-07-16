@@ -373,9 +373,15 @@ export class IntegrationExecutor {
       this.backoffManager.setLastRequestAt(pluginId, Date.now());
 
       try {
+        if (!integration.execute) {
+          throw new Error(
+            `Plugin '${pluginId}' has no execute() — registerIntegration should have caught this.`,
+          );
+        }
+        const execute = integration.execute.bind(integration);
         const records = await withTimeout(
           (signal) =>
-            integration.execute(
+            execute(
               operation.operationId,
               { ...scopedContext, signal },
               operation.params,

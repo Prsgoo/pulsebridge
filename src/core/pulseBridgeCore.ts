@@ -314,6 +314,28 @@ export class PulseBridgeCore extends EventEmitter {
       this.registry.setIntervalOverride(pluginId, options.pollIntervalMs);
     }
 
+    if (
+      integrationPlugin.manifest.operations.length > 0 &&
+      !integrationPlugin.execute
+    ) {
+      throw new PulseBridgeError(
+        `Plugin '${pluginId}' declares operations but does not implement execute().`,
+      );
+    }
+    if (
+      (integrationPlugin.manifest.actions?.length ?? 0) > 0 &&
+      !integrationPlugin.invoke
+    ) {
+      throw new PulseBridgeError(
+        `Plugin '${pluginId}' declares actions but does not implement invoke().`,
+      );
+    }
+    if (integrationPlugin.manifest.webhook && !integrationPlugin.ingest) {
+      throw new PulseBridgeError(
+        `Plugin '${pluginId}' declares a webhook but does not implement ingest().`,
+      );
+    }
+
     this.registry.setIntegration(pluginId, integrationPlugin);
     this.stateManager.enablePlugin(pluginId);
 
