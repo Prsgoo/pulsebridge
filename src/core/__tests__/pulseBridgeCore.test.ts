@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { z } from "zod";
 import { PulseBridgeCore } from "../pulseBridgeCore.js";
 import { InMemoryTokenStore } from "../../contracts/tokens/inMemoryTokenStore.js";
@@ -391,7 +391,6 @@ describe("PulseBridgeCore – start/stop", () => {
     const result: PulseRecord[] = [makeRecord("plane.observation")];
     const plugin = makeIntegrationPlugin("int", "fetch", result, [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     const processor = makeProcessorPlugin("proc", "test.view", [
       "plane.observation",
@@ -425,7 +424,6 @@ describe("PulseBridgeCore – polling config", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 2_000,
-      hard: false,
     });
 
     await core.registerIntegration(plugin);
@@ -439,11 +437,10 @@ describe("PulseBridgeCore – polling config", () => {
     await core.stop();
   });
 
-  it("respects user override when hard is false", async () => {
+  it("respects user override when provided", async () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 10_000,
-      hard: false,
     });
 
     await core.registerIntegration(plugin, undefined, {
@@ -459,24 +456,20 @@ describe("PulseBridgeCore – polling config", () => {
     await core.stop();
   });
 
-  it("ignores user override when hard is true", async () => {
+  it("respects user override even when lower than defaultIntervalMs", async () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 5_000,
-      hard: true,
     });
 
     await core.registerIntegration(plugin, undefined, {
-      pollIntervalMs: 1_000,
+      pollIntervalMs: 2_000,
     });
     await core.start();
     await core.waitForReady();
 
     expect(plugin.execute).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(plugin.execute).toHaveBeenCalledTimes(1);
-
-    await vi.advanceTimersByTimeAsync(4_000);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(plugin.execute).toHaveBeenCalledTimes(2);
 
     await core.stop();
@@ -487,7 +480,6 @@ describe("PulseBridgeCore – polling config", () => {
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 10_000,
       minIntervalMs: 5_000,
-      hard: false,
     });
 
     await core.registerIntegration(plugin, undefined, {
@@ -513,7 +505,6 @@ describe("PulseBridgeCore – rate limiting", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 5_000,
-      hard: true,
     });
 
     await core.registerIntegration(plugin);
@@ -538,7 +529,6 @@ describe("PulseBridgeCore – reactive processor triggering", () => {
     const result: PulseRecord[] = [makeRecord("plane.observation")];
     const plugin = makeIntegrationPlugin("int", "fetch", result, [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
 
     const processor = makeProcessorPlugin("proc", "planes.view", [
@@ -566,7 +556,6 @@ describe("PulseBridgeCore – reactive processor triggering", () => {
     const result: PulseRecord[] = [makeRecord("airport.data")];
     const plugin = makeIntegrationPlugin("int", "fetch", result, [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
 
     const processor = makeProcessorPlugin("proc", "planes.view", [
@@ -723,7 +712,6 @@ describe("PulseBridgeCore – rate limit backoff", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
 
     vi.mocked(plugin.execute)
@@ -756,7 +744,6 @@ describe("PulseBridgeCore – concurrent execution guard", () => {
 
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
 
     vi.mocked(plugin.execute)
@@ -789,7 +776,6 @@ describe("PulseBridgeCore – degraded backoff", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
 
     vi.mocked(plugin.execute)
@@ -823,7 +809,6 @@ describe("PulseBridgeCore – circuit breaker (integrations)", () => {
     });
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockRejectedValue(new Error("always fails"));
 
@@ -848,7 +833,6 @@ describe("PulseBridgeCore – circuit breaker (integrations)", () => {
     });
     const plugin = makeIntegrationPlugin("int", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     vi.mocked(plugin.execute)
       .mockRejectedValueOnce(new Error("fail 1"))
@@ -880,7 +864,6 @@ describe("PulseBridgeCore – circuit breaker (processors)", () => {
     const result: PulseRecord[] = [makeRecord("plane.observation")];
     const plugin = makeIntegrationPlugin("int", "fetch", result, [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     const processor = makeProcessorPlugin("proc", "test.view", [
       "plane.observation",
@@ -910,7 +893,6 @@ describe("PulseBridgeCore – circuit breaker (processors)", () => {
     const result: PulseRecord[] = [makeRecord("plane.observation")];
     const plugin = makeIntegrationPlugin("int", "fetch", result, [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     const processor = makeProcessorPlugin("proc", "test.view", [
       "plane.observation",
@@ -985,7 +967,6 @@ describe("PulseBridgeCore – disablePlugin on processors", () => {
     const result: PulseRecord[] = [makeRecord("plane.observation")];
     const plugin = makeIntegrationPlugin("int", "fetch", result, [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     const processor = makeProcessorPlugin("proc", "test.view", [
       "plane.observation",
@@ -1011,7 +992,6 @@ describe("PulseBridgeCore – disablePlugin on processors", () => {
     const result: PulseRecord[] = [makeRecord("plane.observation")];
     const plugin = makeIntegrationPlugin("int", "fetch", result, [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     const processor = makeProcessorPlugin("proc", "test.view", [
       "plane.observation",
@@ -1043,7 +1023,7 @@ describe("PulseBridgeCore – secret gating", () => {
       "fetch",
       [],
       [{ key: "API_KEY", required: true }],
-      { defaultIntervalMs: 60_000, hard: true },
+      { defaultIntervalMs: 60_000 },
     );
     await core.registerIntegration(plugin);
     await core.start();
@@ -1062,7 +1042,7 @@ describe("PulseBridgeCore – secret gating", () => {
       "fetch",
       [],
       [{ key: "API_KEY", required: true }],
-      { defaultIntervalMs: 60_000, hard: true },
+      { defaultIntervalMs: 60_000 },
     );
     await core.registerIntegration(plugin);
     await core.provision("test-integration", { API_KEY: "value" });
@@ -1082,7 +1062,7 @@ describe("PulseBridgeCore – secret gating", () => {
       "fetch",
       [],
       [{ key: "OPTIONAL_KEY", required: false }],
-      { defaultIntervalMs: 60_000, hard: true },
+      { defaultIntervalMs: 60_000 },
     );
     await core.registerIntegration(plugin);
     await core.start();
@@ -1106,7 +1086,6 @@ describe("PulseBridgeCore – secret provisioning", () => {
       [{ key: SECRET_KEY, required: true }],
       {
         defaultIntervalMs: 60_000,
-        hard: true,
       },
     );
 
@@ -1186,7 +1165,6 @@ describe("PulseBridgeCore – error handling", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 60_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockRejectedValue(
       new ReauthRequiredError("Token expired"),
@@ -1211,7 +1189,6 @@ describe("PulseBridgeCore – error handling", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 60_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockRejectedValue(
       new PluginAuthError("Invalid API key"),
@@ -1234,7 +1211,6 @@ describe("PulseBridgeCore – error handling", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 60_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockRejectedValue(new Error("Network timeout"));
 
@@ -1255,7 +1231,6 @@ describe("PulseBridgeCore – error handling", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 60_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockRejectedValue(
       new RateLimitError("429 Too Many Requests", 30_000),
@@ -1277,7 +1252,6 @@ describe("PulseBridgeCore – error handling", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 60_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockRejectedValueOnce(
       new ReauthRequiredError("Token expired"),
@@ -1321,7 +1295,7 @@ describe("PulseBridgeCore – error handling", () => {
       "fetch",
       [makeRecord("plane.observation")],
       [],
-      { defaultIntervalMs: 60_000, hard: true },
+      { defaultIntervalMs: 60_000 },
     );
     await core.registerIntegration(plugin);
 
@@ -1342,7 +1316,6 @@ describe("PulseBridgeCore – reauth flow", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     plugin.reauth = vi.fn().mockResolvedValue(undefined);
     vi.mocked(plugin.execute)
@@ -1369,7 +1342,6 @@ describe("PulseBridgeCore – reauth flow", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     plugin.reauth = vi.fn().mockResolvedValue(undefined);
     vi.mocked(plugin.execute)
@@ -1393,7 +1365,6 @@ describe("PulseBridgeCore – reauth flow", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     plugin.reauth = vi
       .fn()
@@ -1428,7 +1399,6 @@ describe("PulseBridgeCore – reauth flow", () => {
     const coreWithLogger = new PulseBridgeCore({ logger });
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockRejectedValueOnce(
       new ReauthRequiredError("Token expired"),
@@ -1456,7 +1426,6 @@ describe("PulseBridgeCore – plugin:status-changed events", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 60_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockRejectedValue(new Error("boom"));
 
@@ -1482,7 +1451,6 @@ describe("PulseBridgeCore – plugin:status-changed events", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
     vi.mocked(plugin.execute)
       .mockRejectedValueOnce(new Error("fail"))
@@ -1518,7 +1486,6 @@ describe("PulseBridgeCore – plugin:status-changed events", () => {
     const core = new PulseBridgeCore();
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 1_000,
-      hard: true,
     });
 
     const events: string[] = [];
@@ -1557,7 +1524,7 @@ describe("PulseBridgeCore – oauth2 auth type", () => {
           },
         ],
         auth: { type: "oauth2" },
-        polling: { defaultIntervalMs: 60_000, hard: true },
+        polling: { defaultIntervalMs: 60_000 },
       },
       execute: vi.fn().mockResolvedValue([]),
     };
@@ -1595,7 +1562,7 @@ describe("PulseBridgeCore – oauth2 auth type", () => {
           },
         ],
         auth: { type: "oauth2" },
-        polling: { defaultIntervalMs: 60_000, hard: true },
+        polling: { defaultIntervalMs: 60_000 },
       },
       execute: vi.fn().mockResolvedValue([]),
     };
@@ -1629,7 +1596,7 @@ describe("PulseBridgeCore – oauth2 auth type", () => {
           },
         ],
         auth: { type: "oauth2", tokenKey: "my-custom-token-key" },
-        polling: { defaultIntervalMs: 60_000, hard: true },
+        polling: { defaultIntervalMs: 60_000 },
       },
       execute: vi.fn().mockResolvedValue([]),
     };
@@ -1657,7 +1624,6 @@ describe("PulseBridgeCore – execution timeout", () => {
 
     const plugin = makeIntegrationPlugin("test-integration", "fetch", [], [], {
       defaultIntervalMs: 60_000,
-      hard: true,
     });
     vi.mocked(plugin.execute).mockImplementation(
       () => new Promise<PulseRecord[]>(() => {}),

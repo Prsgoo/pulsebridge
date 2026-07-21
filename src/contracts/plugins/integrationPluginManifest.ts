@@ -20,27 +20,15 @@ export interface RateLimitDefinition {
 }
 
 /**
- * Hard polling: the platform ignores any user-supplied override.
- * Use this when the API enforces a fixed rate limit.
+ * Polling schedule declaration for integration plugins.
+ * The operator may override `defaultIntervalMs` via `pollIntervalMs` in their
+ * server config. The platform clamps any override to `minIntervalMs` at minimum
+ * (or 1000ms when `minIntervalMs` is not set).
  */
-export interface HardPollingConfig {
-  defaultIntervalMs: number;
-  hard: true;
-}
-
-/**
- * Flexible polling: the user may override `defaultIntervalMs` downward
- * to `minIntervalMs` at most. The platform enforces a minimum of 1000ms
- * regardless of this value.
- */
-export interface FlexiblePollingConfig {
+export interface PollingConfig {
   defaultIntervalMs: number;
   minIntervalMs?: number;
-  hard: false;
 }
-
-/** Polling schedule declaration for integration plugins. */
-export type PollingConfig = HardPollingConfig | FlexiblePollingConfig;
 
 /**
  * Auth declaration for integration plugins.

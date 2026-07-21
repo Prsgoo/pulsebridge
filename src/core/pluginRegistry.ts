@@ -129,10 +129,6 @@ export class PluginRegistry {
     const polling = this.integrations.get(pluginId)?.manifest.polling;
     if (!polling) return DEFAULT_POLL_INTERVAL_MS;
 
-    if (polling.hard) {
-      return Math.max(polling.defaultIntervalMs, MIN_INTERVAL_MS);
-    }
-
     const override = this.integrationIntervalOverrides.get(pluginId);
     if (override !== undefined) {
       return Math.max(
