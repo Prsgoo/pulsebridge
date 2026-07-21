@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration tests — exercises the full platform flow using real in-memory implementations.
  * These tests do not mock anything inside the platform boundary.
  */
@@ -42,7 +42,7 @@ function makeSensorIntegration(readings: SensorReading[]): IntegrationPlugin {
           recordType: RECORD_TYPE_SENSOR,
         },
       ],
-      polling: { defaultIntervalMs: 60_000, hard: true },
+      polling: { defaultIntervalMs: 60_000 },
     },
     async execute(
       _operationId: string,
@@ -251,7 +251,7 @@ describe("Platform integration — provisioned secrets", () => {
           type: "apiKey",
           secrets: [{ key: secretKey, required: true }],
         },
-        polling: { defaultIntervalMs: 60_000, hard: true },
+        polling: { defaultIntervalMs: 60_000 },
       },
       async execute(
         _op: string,

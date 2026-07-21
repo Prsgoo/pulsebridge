@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unit tests for IntegrationExecutor — drives the executor directly with real
  * collaborators (registry, state manager, backoff manager, in-memory stores,
  * encrypted vault) and a controllable clock/logger so every guard, error path,
@@ -93,7 +93,7 @@ function makePlugin(overrides: PluginOverrides = {}): IntegrationPlugin {
     operations: overrides.operations ?? [
       { id: "op", name: "Op", recordType: RECORD_TYPE },
     ],
-    polling: overrides.polling ?? { defaultIntervalMs: 60_000, hard: true },
+    polling: overrides.polling ?? { defaultIntervalMs: 60_000 },
     ...(overrides.auth ? { auth: overrides.auth } : {}),
     ...(overrides.rateLimit ? { rateLimit: overrides.rateLimit } : {}),
     ...(overrides.actions ? { actions: overrides.actions } : {}),
@@ -296,9 +296,7 @@ describe("IntegrationExecutor — execute() guards", () => {
 
   it("skips a plugin called again within its minimum poll interval", async () => {
     const h = setup();
-    h.register(
-      makePlugin({ polling: { defaultIntervalMs: 5_000, hard: true } }),
-    );
+    h.register(makePlugin({ polling: { defaultIntervalMs: 5_000 } }));
 
     await h.executor.execute(PLUGIN_ID);
     vi.setSystemTime(BASE_TIME + 1_000);
@@ -309,9 +307,7 @@ describe("IntegrationExecutor — execute() guards", () => {
 
   it("logs a debug message when skipping within the minimum poll interval", async () => {
     const h = setup();
-    h.register(
-      makePlugin({ polling: { defaultIntervalMs: 5_000, hard: true } }),
-    );
+    h.register(makePlugin({ polling: { defaultIntervalMs: 5_000 } }));
 
     await h.executor.execute(PLUGIN_ID);
     vi.setSystemTime(BASE_TIME + 1_000);
@@ -334,7 +330,7 @@ describe("IntegrationExecutor — execute() guards", () => {
     const execute = vi.fn(async () => [makeRecord()]);
     h.register(
       makePlugin({
-        polling: { defaultIntervalMs: 5_000, hard: true },
+        polling: { defaultIntervalMs: 5_000 },
         execute,
       }),
     );
@@ -351,7 +347,7 @@ describe("IntegrationExecutor — execute() guards", () => {
     const execute = vi.fn(async () => [makeRecord()]);
     h.register(
       makePlugin({
-        polling: { defaultIntervalMs: 5_000, hard: true },
+        polling: { defaultIntervalMs: 5_000 },
         execute,
       }),
     );
@@ -912,7 +908,7 @@ describe("IntegrationExecutor — operation errors", () => {
     const h = setup();
     h.register(
       makePlugin({
-        polling: { defaultIntervalMs: 60_000, hard: true },
+        polling: { defaultIntervalMs: 60_000 },
         execute: async () => {
           throw new RateLimitError("429");
         },

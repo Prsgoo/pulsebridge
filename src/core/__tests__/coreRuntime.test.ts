@@ -1,11 +1,4 @@
-/**
- * Tests for the three features added in the gap-fix pass:
- *   1. TransientError — short fixed backoff, no consecutive-failure increment
- *   2. view:updated event — emitted immediately when a processor writes a view
- *   3. Destroy timeout — stop() resolves even when a plugin's destroy() hangs
- */
-
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+﻿import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { PulseBridgeCore } from "../pulseBridgeCore.js";
 import { TransientError } from "../../contracts/errors/pulseErrors.js";
 import type { IntegrationPlugin } from "../../plugin-sdk/integrationPlugin.js";
@@ -29,7 +22,7 @@ function makeIntegration(
       version: "1.0.0",
       kind: "integration",
       operations: [{ id: "fetch", name: "Fetch", recordType: RECORD_TYPE }],
-      polling: { defaultIntervalMs: 60_000, hard: true },
+      polling: { defaultIntervalMs: 60_000 },
     },
     execute,
   };

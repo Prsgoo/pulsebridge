@@ -160,7 +160,7 @@ export interface PulseBridgeCoreOptions {
 }
 
 export interface IntegrationRegistrationOptions {
-  /** Override the plugin's declared poll interval (only respected when manifest.polling.hard is false). */
+  /** Override the plugin's declared poll interval. Clamped to the plugin's `minIntervalMs` floor. */
   pollIntervalMs?: number;
 }
 
@@ -297,8 +297,7 @@ export class PulseBridgeCore extends EventEmitter {
 
     if (options?.pollIntervalMs !== undefined) {
       const polling = integrationPlugin.manifest.polling;
-      const minAllowed =
-        polling && !polling.hard ? (polling.minIntervalMs ?? 1_000) : 1_000;
+      const minAllowed = polling?.minIntervalMs ?? 1_000;
       const MAX_REASONABLE_INTERVAL_MS = 24 * 60 * 60 * 1_000;
       if (options.pollIntervalMs < minAllowed) {
         this.context.logger.warn(
