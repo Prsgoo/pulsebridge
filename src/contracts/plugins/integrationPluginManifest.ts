@@ -48,7 +48,7 @@ export type PollingConfig = HardPollingConfig | FlexiblePollingConfig;
  * - secrets: the list of secrets this plugin needs access to at runtime
  */
 export interface AuthDefinition {
-  type: "none" | "apiKey" | "bearerToken" | "oauth2";
+  type: "none" | "apiKey" | "bearerToken" | "basic" | "oauth2";
   secrets?: ReadonlyArray<SecretRequirement>;
   /**
    * For oauth2 type: the key used to look up this plugin's token in the TokenStore.
