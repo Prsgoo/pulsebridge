@@ -27,7 +27,7 @@ npm install pulsebridge
 Requires **Node.js ≥ 20**. Redis support is an optional peer dependency:
 
 ```bash
-npm install ioredis  # only when using RedisRecordStore / RedisViewStore
+npm install ioredis  # only when using RedisRecordStore / RedisViewStore / RedisStateStore / RedisSecretBackend
 ```
 
 > **Zod** v4 is a direct dependency. If your plugin uses `configSchema`, import `z` from `"zod"`. A project already on Zod v3 will have both coexist in `node_modules` — import from `"zod"` consistently so TypeScript resolves the right `ZodType`.
@@ -57,7 +57,7 @@ const weather: IntegrationPlugin = {
         recordType: "weather.current",
       },
     ],
-    polling: { defaultIntervalMs: 60_000, hard: false },
+    polling: { defaultIntervalMs: 60_000 },
     auth: { type: "apiKey", secrets: [{ key: "WEATHER_KEY", required: true }] },
   },
 
@@ -122,10 +122,11 @@ Actions return an `ActionResult` — a response payload plus optional records to
 
 ## Official plugins
 
-A growing set of ready-made integrations lives in the [pulsebridge-plugins](https://github.com/Prsgoo/pulsebridge-plugins) monorepo. Install any over npm:
+A set of ready-made plugins lives in the [`pulsebridge-plugins`](https://github.com/Prsgoo/pulsebridge-plugins) monorepo — 20 integration packages covering weather, markets, seismic activity, flights, news, CVEs, space data, and more, plus 7 processor packages that aggregate those records into typed views. Install any over npm:
 
 ```bash
 npm install @prsgoo/integration-openweather
+npm install @prsgoo/processor-weather-feed
 ```
 
 They conform to the same contract as any third-party plugin. Scaffold your own self-contained package:
@@ -151,11 +152,12 @@ import { PluginKinds } from "pulsebridge";
 export class MyIntegration implements IntegrationPlugin {
   readonly manifest = {
     id: "@example/my-integration",
+    name: "My Integration",
+    version: "1.0.0",
     kind: PluginKinds.INTEGRATION,
-    operations: [{ id: "fetch-data" }],
-    // hard: false → user can override the interval (clamped to minIntervalMs)
-    // hard: true  → interval is fixed (API rate-limit constraint)
-    polling: { defaultIntervalMs: 60_000, hard: false, minIntervalMs: 10_000 },
+    operations: [{ id: "fetch-data", name: "Fetch data", recordType: "my.data" }],
+    // minIntervalMs: host overrides via registerIntegration() are clamped to this floor
+    polling: { defaultIntervalMs: 60_000, minIntervalMs: 10_000 },
     auth: {
       type: "apiKey" as const,
       secrets: [{ key: "MY_API_KEY", required: true }],
@@ -189,16 +191,18 @@ import { PluginKinds } from "pulsebridge";
 export class MyProcessor implements ProcessorPlugin {
   readonly manifest = {
     id: "@example/my-processor",
+    name: "My Processor",
+    version: "1.0.0",
     kind: PluginKinds.PROCESSOR,
     consumes: ["weather.current"], // record types this processor reacts to
     produces: ["my-view"], // declares the view name this processor emits
-    providesCapabilities: [],
   };
 
   async process(
     records: ReadonlyArray<PulseRecord>,
     _ctx: RuntimeContext,
-  ): Promise<PulseViewRecord> {
+  ): Promise<PulseViewRecord | null> {
+    if (records.length === 0) return null; // returning null skips emitting a view
     return {
       view: "my-view",
       generatedAt: new Date().toISOString(),
@@ -216,6 +220,8 @@ A processor can depend on views produced by other processors using `consumesView
 export class SummaryProcessor implements ProcessorPlugin {
   readonly manifest = {
     id: "@example/summary-processor",
+    name: "Summary Processor",
+    version: "1.0.0",
     kind: PluginKinds.PROCESSOR,
     consumes: [], // receives all record types
     consumesViews: ["my-view"], // waits for MyProcessor to run first
@@ -226,13 +232,24 @@ export class SummaryProcessor implements ProcessorPlugin {
     records: ReadonlyArray<PulseRecord>,
     _ctx: RuntimeContext,
     views?: ReadonlyArray<PulseViewRecord>, // contains "my-view" result
-  ): Promise<PulseViewRecord> {
+  ): Promise<PulseViewRecord | null> {
     // ...
   }
 }
 ```
 
 Processors that declare neither `produces` nor `consumesViews` run in the first pass. Chained processors run after their dependencies, all in topological order. The platform logs a warning if it detects a cycle.
+
+### Plugin lifecycle hooks
+
+Both integration and processor plugins can optionally implement:
+
+| Method | Called by | Purpose |
+| --- | --- | --- |
+| `init(context)` | Platform after registration, before first execution | Warm up connections, validate config |
+| `configure(config)` | Platform when config is applied | React to config changes at runtime |
+| `destroy()` | Platform on `stop()` | Close connections, flush state |
+| `reauth(context)` | Platform when status is `needs_reauth` | Refresh credentials (integrations only) |
 
 ## Configuration
 
@@ -271,13 +288,17 @@ const platform = new PulseBridgeCore({
   // Circuit breaker: permanently disable after N consecutive unexpected failures
   // When unset, retries indefinitely with exponential backoff
   maxConsecutiveFailures: 5,
+
+  // Key-value state store for processor plugins (defaults to in-memory)
+  // Use RedisStateStore to persist processor state across restarts
+  stateStore: new RedisStateStore({ client: redisClient }),
 });
 ```
 
 ### Overriding poll intervals
 
 ```ts
-// Accepted only when manifest.polling.hard is false; clamped to manifest.polling.minIntervalMs
+// Clamped to the plugin's manifest.polling.minIntervalMs floor (or 1000ms if not declared)
 await platform.registerIntegration(new MyIntegration(), undefined, {
   pollIntervalMs: 30_000,
 });
@@ -285,15 +306,21 @@ await platform.registerIntegration(new MyIntegration(), undefined, {
 
 ## Plugin status
 
-The platform tracks the status of each plugin. Listen for transitions:
+The platform tracks the status of each plugin and emits events on transitions:
 
 ```ts
+// Plugin polling status changed
 platform.on(
   "plugin:status-changed",
   ({ pluginId, previousStatus, newStatus }) => {
     console.log(`${pluginId}: ${previousStatus} → ${newStatus}`);
   },
 );
+
+// A processor emitted an updated view
+platform.on("view:updated", (view) => {
+  console.log(`View updated: ${view.view}`);
+});
 ```
 
 Status values: `enabled` · `disabled` · `degraded` · `auth_error` · `needs_reauth` · `misconfigured` · `rate_limited`
@@ -307,22 +334,28 @@ platform.getHealth(); // { status: "healthy" | "degraded" | "stopped", running, 
 // Manual control
 platform.disablePlugin("my-plugin-id", "optional reason");
 platform.enablePlugin("my-plugin-id"); // also clears backoff state
+
+// Lifecycle
+await platform.start();
+await platform.waitForReady(); // resolves after the initial integration pass
+await platform.stop();        // graceful shutdown; calls destroy() on each plugin
 ```
 
 ## Error handling
 
 Plugins signal errors by throwing typed classes exported from `pulsebridge`:
 
-| Class                 | When to throw                         | Platform response                                                                   |
-| --------------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
-| `PluginAuthError`     | Credentials rejected by the API       | Sets status `auth_error`                                                            |
-| `ReauthRequiredError` | Token expired / session invalid       | Calls `reauth()`, sets `needs_reauth` if not implemented                            |
-| `RateLimitError`      | HTTP 429 or equivalent                | Backs off for `retryAfterMs` (or `rateLimitDefaultBackoffMs`, or `2× pollInterval`) |
-| `PluginInputError`    | Bad action payload / unsigned webhook | Surfaced to the caller; does not degrade the polling channel                        |
+| Class                 | When to throw                         | Platform response                                                                                              |
+| --------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `PluginAuthError`     | Credentials rejected by the API       | Sets status `auth_error`                                                                                       |
+| `ReauthRequiredError` | Token expired / session invalid       | Calls `reauth()`, sets `needs_reauth` if not implemented                                                       |
+| `RateLimitError`      | HTTP 429 or equivalent                | Sets status `rate_limited`, backs off for `retryAfterMs` (or `rateLimitDefaultBackoffMs`, or `2× pollInterval`) |
+| `TransientError`      | Temporary upstream failure (5xx, etc) | Keeps status `degraded` with a short fixed backoff; does NOT increment the circuit-breaker failure counter      |
+| `PluginInputError`    | Bad action payload / unsigned webhook | Surfaced to the caller; does not affect plugin health                                                          |
 
 Accessing a secret key not declared in the plugin manifest throws `ScopedSecretAccessError` (a subclass of `PluginAuthError`), handled identically to an auth error — no exponential backoff, status set to `auth_error`.
 
-Unexpected errors trigger exponential backoff (doubles per consecutive failure, capped at `maxDegradedBackoffMs`). If `maxConsecutiveFailures` is set, the plugin is permanently disabled after that many consecutive failures.
+Any other unhandled error is treated as unexpected: exponential backoff doubles per consecutive failure up to `maxDegradedBackoffMs`. If `maxConsecutiveFailures` is set, the plugin is permanently disabled after that many consecutive failures.
 
 ## Secrets
 
@@ -357,8 +390,14 @@ Encryption is AES-256-GCM, keyed from the host-supplied `masterKey`. Without a m
 | ------------------------------------------- | --------------------------------------------- |
 | `InMemoryRecordStore` / `InMemoryViewStore` | Tests, examples, single-process apps          |
 | `RedisRecordStore` / `RedisViewStore`       | Production; enables multi-process read access |
+| `InMemoryStateStore`                        | Processor state; resets on restart (default)  |
+| `RedisStateStore`                           | Processor state; persists across restarts     |
 
-Both implement the `RecordStore` / `ViewStore` interfaces — you can provide your own.
+All implement their respective interfaces (`RecordStore`, `ViewStore`, `StateStore`) — you can provide your own.
+
+## Showcase
+
+[`pulsebridge-showcase`](https://github.com/Prsgoo/pulsebridge-showcase) is a reference server built on this library. It is config-driven, loads plugins from npm at startup, exposes a full REST + SSE API, and ships with a React dashboard that visualizes all active views in real time. Source: [`apps/server`](https://github.com/Prsgoo/pulsebridge-showcase/tree/main/apps/server).
 
 ## Changelog
 
